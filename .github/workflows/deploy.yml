@@ -55,6 +55,7 @@ jobs:
             # -v: Mounts the persistent volume.
             #     Left side ($APP_DATA_DIR): The path on your remote server's host filesystem.
             #     Right side (:/app/data): The path *inside your Docker container* where the app expects its data.
+            cd /learnin-modules/jenkins-test
             docker run -d \
               --name fastapi-app-container \
               -p ${{ secrets.APP_PORT }}:${{ secrets.APP_PORT }} \
