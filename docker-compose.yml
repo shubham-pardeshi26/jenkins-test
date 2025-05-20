@@ -1,0 +1,43 @@
+# docker-compose.yml
+
+version: '3.8'
+
+services:
+  db:
+    image: postgres:13-alpine # Using a specific version of Alpine PostgreSQL image
+    container_name: postgres_db
+    environment:
+      POSTGRES_DB: mydatabase # The database name
+      POSTGRES_USER: user     # The database user
+      POSTGRES_PASSWORD: password # The database password (DO NOT USE IN PRODUCTION!)
+    volumes:
+      - pg_data:/var/lib/postgresql/data # Persistent volume for database data
+    ports:
+      - "5432:5432" # Expose PostgreSQL port (optional, good for local dev/debugging)
+    healthcheck: # Healthcheck for the database service
+      test: ["CMD-SHELL", "pg_isready -U user -d mydatabase"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: . # Build from the Dockerfile in the current directory
+    container_name: fastapi_app
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://user:password@db:5432/mydatabase # Connect to the 'db' service
+    depends_on:
+      db:
+        condition: service_healthy # Wait for the 'db' service's healthcheck to pass
+    volumes:
+      - .:/app # Mount the current directory into the container (useful for hot-reloading in dev, remove for prod)
+    # The entrypoint.sh handles migration and app startup
+    # healthcheck: # Optional: Add a healthcheck for the web service too
+    #   test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+
+volumes:
+  pg_data: # Define the named volume for PostgreSQL data
