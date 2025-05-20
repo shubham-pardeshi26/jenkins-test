@@ -33,7 +33,7 @@ jobs:
             # Define the path on the host server where the persistent application data (like SQLite DB) will be stored.
             # This directory will hold your 'sql_app.db' file.
             APP_DATA_DIR="/var/lib/fastapi_app_data" 
-
+            sudo su
             echo "Stopping existing container (if any)..."
             # Stop the old container gracefully. '|| true' ensures the command doesn't fail
             # the script if the container doesn't exist (e.g., on first deploy).
