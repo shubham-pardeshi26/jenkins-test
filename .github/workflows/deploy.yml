@@ -1,3 +1,5 @@
+# .github/workflows/deploy.yml
+
 name: Deploy FastAPI App
 
 on:
@@ -11,36 +13,52 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4 # Action to checkout your code
+        uses: actions/checkout@v4 # Action to checkout your code from your GitHub repository
 
       - name: Build Docker Image
+        # This step builds your FastAPI application's Docker image.
+        # The image is tagged as 'fastapi-app:latest' for easy reference.
         run: docker build -t fastapi-app:latest .
 
       - name: Deploy to Remote Server
-        uses: appleboy/ssh-action@v1.0.3 # Action to run commands over SSH on a remote server
+        # This step uses the 'appleboy/ssh-action' to connect to your remote server
+        # via SSH and execute commands to deploy your application.
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 22 # Standard SSH port, change if your server uses a different one
+          host: ${{ secrets.SSH_HOST }}       # Your server's IP address (from GitHub Secrets)
+          username: ${{ secrets.SSH_USERNAME }} # SSH username for your server (from GitHub Secrets)
+          key: ${{ secrets.SSH_PRIVATE_KEY }}   # SSH private key for authentication (from GitHub Secrets)
+          port: 22                            # Standard SSH port, change if your server uses a different one
           script: |
-            # Define the path on the host for persistent data
-            APP_DATA_DIR="/var/lib/fastapi_app_data" # This is the directory on your server's host filesystem
+            # Define the path on the host server where the persistent application data (like SQLite DB) will be stored.
+            # This directory will hold your 'sql_app.db' file.
+            APP_DATA_DIR="/var/lib/fastapi_app_data" 
 
             echo "Stopping existing container (if any)..."
-            docker stop fastapi-app-container || true # Stop the old container, ignore error if it doesn't exist
+            # Stop the old container gracefully. '|| true' ensures the command doesn't fail
+            # the script if the container doesn't exist (e.g., on first deploy).
+            docker stop fastapi-app-container || true 
+            
             echo "Removing existing container (if any)..."
-            docker rm fastapi-app-container || true # Remove the old container
+            # Remove the old container. '|| true' ensures the command doesn't fail.
+            docker rm fastapi-app-container || true
 
-            # Ensure the data directory exists on the host server
             echo "Ensuring data directory exists on host: $APP_DATA_DIR"
+            # Create the persistent data directory on the host server if it doesn't already exist.
+            # The '-p' flag creates parent directories as needed and prevents errors if the directory exists.
             mkdir -p $APP_DATA_DIR
 
             echo "Running the new container with persistent volume..."
+            # Run the new Docker container in detached mode (-d).
+            # --name: Assigns a name to the container for easy management.
+            # -p: Maps the application's port from the container to the host.
+            # -v: Mounts the persistent volume.
+            #     Left side ($APP_DATA_DIR): The path on your remote server's host filesystem.
+            #     Right side (:/app/data): The path *inside your Docker container* where the app expects its data.
             docker run -d \
               --name fastapi-app-container \
               -p ${{ secrets.APP_PORT }}:${{ secrets.APP_PORT }} \
-              -v $APP_DATA_DIR:/app/data \ # <--- THIS IS THE CRUCIAL CHANGE FOR PERSISTENCE
+              -v $APP_DATA_DIR:/app/data \
               fastapi-app:latest
 
             echo "Deployment script finished."
