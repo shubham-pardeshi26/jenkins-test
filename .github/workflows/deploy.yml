@@ -1,0 +1,46 @@
+name: Deploy FastAPI App
+
+on:
+  push:
+    branches:
+      - main # Trigger this workflow when code is pushed to the 'main' branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest # Use the latest Ubuntu runner provided by GitHub Actions
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4 # Action to checkout your code
+
+      - name: Build Docker Image
+        run: docker build -t fastapi-app:latest .
+
+      - name: Deploy to Remote Server
+        uses: appleboy/ssh-action@v1.0.3 # Action to run commands over SSH on a remote server
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22 # Standard SSH port, change if your server uses a different one
+          script: |
+            # Define the path on the host for persistent data
+            APP_DATA_DIR="/var/lib/fastapi_app_data" # This is the directory on your server's host filesystem
+
+            echo "Stopping existing container (if any)..."
+            docker stop fastapi-app-container || true # Stop the old container, ignore error if it doesn't exist
+            echo "Removing existing container (if any)..."
+            docker rm fastapi-app-container || true # Remove the old container
+
+            # Ensure the data directory exists on the host server
+            echo "Ensuring data directory exists on host: $APP_DATA_DIR"
+            mkdir -p $APP_DATA_DIR
+
+            echo "Running the new container with persistent volume..."
+            docker run -d \
+              --name fastapi-app-container \
+              -p ${{ secrets.APP_PORT }}:${{ secrets.APP_PORT }} \
+              -v $APP_DATA_DIR:/app/data \ # <--- THIS IS THE CRUCIAL CHANGE FOR PERSISTENCE
+              fastapi-app:latest
+
+            echo "Deployment script finished."

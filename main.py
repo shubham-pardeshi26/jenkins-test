@@ -6,11 +6,11 @@ from typing import List, Optional
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-import os # Keep this for os.makedirs
+import os # Import os module to get environment variables
 
 # --- Database Configuration ---
-# The database file will be created directly in the /app/ directory inside the container
-DATABASE_URL = "sqlite:///./sql_app.db"
+# The database file will now be in the 'data' subdirectory relative to the app's root
+DATABASE_URL = "sqlite:///./data/sql_app.db"
 
 # Create a SQLAlchemy engine
 engine = create_engine(
@@ -46,11 +46,11 @@ class User(Base):
 def create_db_tables():
     """Creates all database tables if they don't exist."""
     print("Attempting to create database tables...")
-    # Ensure the directory exists before creating the database file (for consistency, though redundant for '.')
+    # Ensure the 'data' directory exists before creating the database file
     db_file_path = DATABASE_URL.replace("sqlite:///./", "")
     db_dir = os.path.dirname(db_file_path)
     if db_dir and not os.path.exists(db_dir):
-        os.makedirs(db_dir, exist_ok=True)
+        os.makedirs(db_dir, exist_ok=True) # Create the 'data' directory
 
     Base.metadata.create_all(bind=engine)
     print("Database tables created (if they didn't exist).")
@@ -226,36 +226,7 @@ async def update_user(user_id: int, user: UserCreate, db: Session = Depends(get_
     return db_user
 
 @app.delete("/users/{user_id}", status_code=204, summary="Delete a user")
-async def delete_user(item_id: int, db: Session = Depends(get_db)):
+async def delete_user(user_id: int, db: Session = Depends(get_db)): # Fixed parameter name here
     """
-    Delete an item from the database by its ID.
+    Delete a user from the database by their ID.
     """
-    db_item = db.query(Item).filter(Item.id == item_id).first()
-    if db_item is None:
-        raise HTTPException(status_code=404, detail="Item not found")
-    db.delete(db_item)
-    db.commit()
-    return {"message": "Item deleted successfully"}
-
-# --- Health Check Endpoint (Useful for CI/CD) ---
-
-@app.get("/health", summary="Health check endpoint")
-async def health_check(db: Session = Depends(get_db)):
-    """
-    Returns a simple status to indicate the API is running and can connect to the database.
-    """
-    try:
-        # Try to execute a simple query to check database connectivity
-        db.execute(Item.__table__.select().limit(1))
-        return {"status": "healthy", "message": "API is up and running, database connected!"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database connection failed: {e}")
-
-# --- Simple Test Endpoint (Example for unit testing) ---
-
-@app.get("/add/{num1}/{num2}", summary="Add two numbers")
-async def add_numbers(num1: int, num2: int):
-    """
-    Returns the sum of two numbers.
-    """
-    return {"result": num1 + num2}
