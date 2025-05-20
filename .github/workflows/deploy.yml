@@ -14,12 +14,6 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4 # Action to checkout your code from your GitHub repository
-
-      - name: Build Docker Image
-        # This step builds your FastAPI application's Docker image.
-        # The image is tagged as 'fastapi-app:latest' for easy reference.
-        run: docker build -t fastapi-app:latest .
-
       - name: Deploy to Remote Server
         # This step uses the 'appleboy/ssh-action' to connect to your remote server
         # via SSH and execute commands to deploy your application.
@@ -30,32 +24,16 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}   # SSH private key for authentication (from GitHub Secrets)
           port: 22                            # Standard SSH port, change if your server uses a different one
           script: |
-            # Define the path on the host server where the persistent application data (like SQLite DB) will be stored.
-            # This directory will hold your 'sql_app.db' file.
-            APP_DATA_DIR="/var/lib/fastapi_app_data" 
-            sudo su
-            echo "Stopping existing container (if any)..."
-            # Stop the old container gracefully. '|| true' ensures the command doesn't fail
-            # the script if the container doesn't exist (e.g., on first deploy).
-            docker stop fastapi-app-container || true 
             
-            echo "Removing existing container (if any)..."
-            # Remove the old container. '|| true' ensures the command doesn't fail.
-            docker rm fastapi-app-container || true
+            APP_DATA_DIR="/learnin-modules/docker_data_persists" 
+            MAIN_GIT_REPO="/learnin-modules/jenkins-test"
+            cd $MAIN_GIT_REPO
+            echo "rebuilding the docker image"
 
-            echo "Ensuring data directory exists on host: $APP_DATA_DIR"
-            # Create the persistent data directory on the host server if it doesn't already exist.
-            # The '-p' flag creates parent directories as needed and prevents errors if the directory exists.
-            mkdir -p $APP_DATA_DIR
+            docker build -t fastapi-app:latest .
 
             echo "Running the new container with persistent volume..."
-            # Run the new Docker container in detached mode (-d).
-            # --name: Assigns a name to the container for easy management.
-            # -p: Maps the application's port from the container to the host.
-            # -v: Mounts the persistent volume.
-            #     Left side ($APP_DATA_DIR): The path on your remote server's host filesystem.
-            #     Right side (:/app/data): The path *inside your Docker container* where the app expects its data.
-            cd /learnin-modules/jenkins-test
+            
             docker run -d \
               --name fastapi-app-container \
               -p ${{ secrets.APP_PORT }}:${{ secrets.APP_PORT }} \
